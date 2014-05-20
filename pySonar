@@ -1,0 +1,49 @@
+#!/usr/bin/python -tt
+
+import pyaudio
+import wave
+
+ChirpFile = "Sound Files/test_sp.wav"
+Chunk = 1024
+#Ideal to generate own chirp for ease of autocorrelation
+#work on it later
+#def chirp():
+    #Chirp parameters
+    #Frequencies in Hertz
+#    startFreq = 5000
+#    endFreq = 20000
+    #Frequency change between each 
+#    stepFreq = 100
+    #Duration in milliseconds
+#    duration = 4500
+#    freqChanges = range(startFreq, endFreq, stepFreq)
+#    freqDuration = duration / len(freqChanges)
+
+#    for f in freqChanges:
+#        winsound.Beep(f, freqDuration)
+    
+
+def main():
+    print "Hello, World!"
+    transmitChirp = wave.open(ChirpFile, 'r')
+    #winsound.PlaySound(ChirpFile, winsound.SND_FILENAME)
+    #winsound.PlaySound(transmitChirp.readframes(transmitChirp.getnframes()), winsound.SND_MEMORY)
+
+    p = pyaudio.PyAudio()
+    stream = p.open(format=p.get_format_from_width(transmitChirp.getsampwidth()),
+                    channels=transmitChirp.getnchannels(),
+                    rate=transmitChirp.getframerate(),
+                    output=True)
+    data = transmitChirp.readframes(Chunk)
+
+    while data != '':
+        stream.write(data)
+        data = transmitChirp.readframes(Chunk)
+
+    stream.stop_stream()
+    stream.close()
+
+    p.terminate()
+
+if __name__ == '__main__':
+    main()
