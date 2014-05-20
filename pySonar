@@ -2,34 +2,25 @@
 
 import pyaudio
 import wave
+from pylab import *
 
-ChirpFile = "Sound Files/test_sp.wav"
+ChirpFile = "Sound Files/plain_chirp.wav"
 Chunk = 1024
-#Ideal to generate own chirp for ease of autocorrelation
-#work on it later
-#def chirp():
-    #Chirp parameters
-    #Frequencies in Hertz
-#    startFreq = 5000
-#    endFreq = 20000
-    #Frequency change between each 
-#    stepFreq = 100
-    #Duration in milliseconds
-#    duration = 4500
-#    freqChanges = range(startFreq, endFreq, stepFreq)
-#    freqDuration = duration / len(freqChanges)
+Format = pyaudio.paInt16
+Channels = 2
+Rate = 44100#384000
+Record_Seconds = 1
+Wave_Output_Filename = "Sound Files/output.wav"
 
-#    for f in freqChanges:
-#        winsound.Beep(f, freqDuration)
-    
+#Require: Requires an exisitng pyAudio object which has set
+#       up the port audio system
+#Ensures: Plays the ChirpFile wave file over the speakers
+#       if the speakers are available
 
-def main():
-    print "Hello, World!"
+def chirp(p):
     transmitChirp = wave.open(ChirpFile, 'r')
-    #winsound.PlaySound(ChirpFile, winsound.SND_FILENAME)
-    #winsound.PlaySound(transmitChirp.readframes(transmitChirp.getnframes()), winsound.SND_MEMORY)
 
-    p = pyaudio.PyAudio()
+    #p = pyaudio.PyAudio()
     stream = p.open(format=p.get_format_from_width(transmitChirp.getsampwidth()),
                     channels=transmitChirp.getnchannels(),
                     rate=transmitChirp.getframerate(),
@@ -43,6 +34,48 @@ def main():
     stream.stop_stream()
     stream.close()
 
+#Requires: Requires an existing pyAudio object which has set
+#       up the port audio system
+#Ensures: Returns an array of frames containing the recorded data
+
+def record(p):
+    stream = p.open(format=Format,
+                    channels=Channels,
+                    rate=Rate,
+                    input=True,
+                    frames_per_buffer=Chunk)
+    print 'Recording'
+    frames = []
+    framesNum = []
+    for i in range(0, int(Rate/Chunk * Record_Seconds)):
+        data = stream.read(Chunk)
+        frames.append(data)
+        framesNum.append(fromstring(data, 'Int16'))
+
+    #print frames[0:20]
+    stream.stop_stream()
+    stream.close()
+    print framesNum[0:5]
+    return framesNum
+
+#Using [1] as reference
+def show_wave(audio):
+    subplot(211)
+    plot(audio)
+    title('Wave form and spectrogram of recorded audio')
+
+    subplot(212)
+    spectrogram = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
+
+    show()
+
+def main():
+    #Instantiate pyAudio
+    p = pyaudio.PyAudio()
+    #Use pyAudio object to transmit and record sound
+    chirp(p)
+    audio = record(p)
+    show_wave(audio)
     p.terminate()
 
 if __name__ == '__main__':
