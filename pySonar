@@ -3,6 +3,7 @@
 import pyaudio
 import wave
 from pylab import *
+import time
 
 ChirpFile = "Sound Files/plain_chirp.wav"
 Chunk = 1024
@@ -10,7 +11,16 @@ Format = pyaudio.paInt16
 Channels = 2
 Rate = 44100#384000
 Record_Seconds = 1
-Wave_Output_Filename = "Sound Files/output.wav"
+
+transmitChirp = wave.open(ChirpFile, 'r')
+
+recordData = []
+
+def callback(in_data, frame_count, time_info, status):
+    #print in_data[0:5]
+    #out_data = transmitChirp.readframes(frame_count)
+    recordData.extend(fromstring(in_data, 'Int16'))
+    return(in_data , pyaudio.paContinue)
 
 #Require: Requires an exisitng pyAudio object which has set
 #       up the port audio system
@@ -18,7 +28,7 @@ Wave_Output_Filename = "Sound Files/output.wav"
 #       if the speakers are available
 
 def chirp(p):
-    transmitChirp = wave.open(ChirpFile, 'r')
+    #transmitChirp = wave.open(ChirpFile, 'r')
 
     #p = pyaudio.PyAudio()
     stream = p.open(format=p.get_format_from_width(transmitChirp.getsampwidth()),
@@ -50,9 +60,10 @@ def record(p):
     for i in range(0, int(Rate/Chunk * Record_Seconds)):
         data = stream.read(Chunk)
         frames.append(data)
-        numList = fromstring(data, 'Int16')
-        for l in numList:
-            framesNum.append(l)
+        #numList = fromstring(data, 'Int16')
+        #for l in numList:
+        #    framesNum.append(l)
+        framesNum.extend(fromstring(data, 'Int16'))
 
     #print frames[0:20]
     stream.stop_stream()
@@ -69,16 +80,44 @@ def show_wave(audio):
     subplot(212)
     spectrogram = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
 
-    pause(0.05)
+    #pause(0.05)
+    show()
 
 def main():
     #Instantiate pyAudio
     p = pyaudio.PyAudio()
-    while (True):
+    #while (True):
         #Use pyAudio object to transmit and record sound
+    #    chirp(p)
+    #    audio = record(p)
+    #    show_wave(audio)
+    stream = p.open(format=p.get_format_from_width(transmitChirp.getsampwidth()),
+                    channels=Channels,
+                    rate=Rate,
+                    input=True,
+                    output=False,
+                    stream_callback=callback)
+
+    stream.start_stream()
+    #time.sleep(1)
+    #stream.stop_stream()
+    #print len(recordData), "my length", recordDataLength
+    #show_wave(recordData)
+    
+    while True:
+        #Keep just playing the chirp and showing the data
         chirp(p)
-        audio = record(p)
-        show_wave(audio)
+        time.sleep(0.5)
+        #Stuck here trying to find a way to get new data from the callback
+        #function
+        newData = recordData
+        recordData = []
+        #print "recorded data", recordData[0:100]
+        show_wave(recordData)
+        
+    stream.stop_stream()
+    stream.close()
+    
     p.terminate()
 
 if __name__ == '__main__':
