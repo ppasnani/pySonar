@@ -50,12 +50,14 @@ def record(p):
     for i in range(0, int(Rate/Chunk * Record_Seconds)):
         data = stream.read(Chunk)
         frames.append(data)
-        framesNum.append(fromstring(data, 'Int16'))
+        numList = fromstring(data, 'Int16')
+        for l in numList:
+            framesNum.append(l)
 
     #print frames[0:20]
     stream.stop_stream()
     stream.close()
-    print framesNum[0:5]
+    #print framesNum[0:5]
     return framesNum
 
 #Using [1] as reference
@@ -67,15 +69,16 @@ def show_wave(audio):
     subplot(212)
     spectrogram = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
 
-    show()
+    pause(0.05)
 
 def main():
     #Instantiate pyAudio
     p = pyaudio.PyAudio()
-    #Use pyAudio object to transmit and record sound
-    chirp(p)
-    audio = record(p)
-    show_wave(audio)
+    while (True):
+        #Use pyAudio object to transmit and record sound
+        chirp(p)
+        audio = record(p)
+        show_wave(audio)
     p.terminate()
 
 if __name__ == '__main__':
