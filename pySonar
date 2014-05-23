@@ -5,6 +5,7 @@ import wave
 from pylab import *
 import time
 import Queue
+import winsound
 
 ChirpFile = "Sound Files/plain_chirp.wav"
 Chunk = 1024
@@ -14,15 +15,31 @@ Rate = 44100#384000
 Record_Seconds = 1
 
 transmitChirp = wave.open(ChirpFile, 'r')
+#out_data = transmitChirp.readframes(Chunk)
+
 #Create a synchronized queue that can only hold one list
 recordQueue = Queue.Queue(Chunk)
 
 def callback(in_data, frame_count, time_info, status):
     #print in_data[0:5]
-    #out_data = transmitChirp.readframes(frame_count)
+    out_data = transmitChirp.readframes(frame_count)
+    #int_out_data = fromstring(out_data, '
     #recordData.extend(fromstring(in_data, 'Int16'))
-    #out_data = transmitChirp.readframes(Chunk)
-    #recordQueue.put(fromstring(in_data, 'Int16'))
+    #out_data = transmitChirp.readframes(Chunk)    
+    #print out_data
+    transmitChirp.setpos(0)
+
+    chirp_data = out_data
+    print chirp_data[0:10]
+    #chirp_data = []
+    #for b in out_data:
+    #    #if b != '':
+    #    chirp_data.extend(int(b))
+    
+    recordQueue.put(fromstring(in_data, 'Int16'))
+    print 'frame', frame_count, 'data', len(out_data), 'indata', len(in_data)   
+    #recordQueue.task_done()
+    #print 'stuck here'
     return(in_data , pyaudio.paContinue)
 
 #Require: Requires an exisitng pyAudio object which has set
@@ -80,10 +97,13 @@ def show_wave(audio):
     #plot(audio)
     #title('Wave form and spectrogram of recorded audio')
 
-    #subplot(212)
+    #subplot(212)    
+    audioTime = float(len(audio)) / Rate
+    #print (len(audio)), 'time', audioTime
+        
     spectrogram = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
-
-    pause(0.005)
+    xlim([0, audioTime])
+    pause(0.01)
     #show()
 
 def main():
@@ -98,7 +118,7 @@ def main():
                     channels=Channels,
                     rate=Rate,
                     input=True,
-                    output=True,
+                    output=False,
                     stream_callback=callback)
 
     stream.start_stream()
@@ -110,21 +130,24 @@ def main():
 
     chirp(p)
     
+    
     while True:
         #Keep just playing the chirp and showing the data
-        chirp(p)
+        #chirp(p)
         #time.sleep(0.5)
         #Stuck here trying to find a way to get new data from the callback
         #function
         #newData = recordData
         recordData = []
         for i in range(recordQueue.qsize()):
-            recordData.extend(recordQueue.get())
+            #print 'record extend'
+            recordData.extend(recordQueue.get(block=False))
+            recordQueue.task_done()
             #print 'i', i
         #for l in recordFrameData:
         #    recordData.append(l)
-        #print 'data', recordData[0:2]
-        recordQueue.task_done()
+        #print 'recorddata', recordData[0:10]
+        
         #print "recorded data", recordData[0:100]
         show_wave(recordData)
 
