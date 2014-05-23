@@ -8,13 +8,15 @@ import Queue
 import winsound
 
 ChirpFile = "Sound Files/plain_chirp.wav"
+transmitChirp = wave.open(ChirpFile, 'rb')
+
 Chunk = 1024
 Format = pyaudio.paInt16
-Channels = 2
-Rate = 44100#384000
-Record_Seconds = 1
+#Channels = 2
+#Rate = 44100#384000
+#Record_Seconds = 1
 
-transmitChirp = wave.open(ChirpFile, 'r')
+
 #out_data = transmitChirp.readframes(Chunk)
 
 #Create a synchronized queue that can only hold one list
@@ -28,19 +30,42 @@ def callback(in_data, frame_count, time_info, status):
     #out_data = transmitChirp.readframes(Chunk)    
     #print out_data
     transmitChirp.setpos(0)
-
-    chirp_data = out_data
-    print chirp_data[0:10]
-    #chirp_data = []
-    #for b in out_data:
-    #    #if b != '':
-    #    chirp_data.extend(int(b))
+    
+    chirp_data = []
+    int_out_data = fromstring(out_data, 'Int16')
+    for b in int_out_data:
+        #print getBitArray(b)
+        chirp_data.extend(getBitArray(b))        
     
     recordQueue.put(fromstring(in_data, 'Int16'))
-    print 'frame', frame_count, 'data', len(out_data), 'indata', len(in_data)   
+    print 'frame', frame_count, 'data', len(chirp_data), 'indata', len(in_data)   
     #recordQueue.task_done()
     #print 'stuck here'
-    return(in_data , pyaudio.paContinue)
+    if len(chirp_data) is 0:
+        return (in_data, pyaudio.paContinue)
+    else:
+        return(chirp_data , pyaudio.paContinue)
+
+#Require: An integer intNum
+#Ensures: Returns a list of numbers [0, 1] of length 16
+#       that represent intNum in binary format
+def getBitArray(intNum):
+    if intNum > 0:
+        #bin(num) Returns in string format 0b1011....
+        bitList = fromstring(bin(intNum)[2:], 'bool').tolist()
+        #return ()
+    else:
+        #Negative num returns in string format -0b101.
+        bitList = fromstring(bin(intNum)[3:], 'bool').tolist()
+        #return (fromstring(bin(intNum)[3:], 'bool'))
+    
+    zeroPad = 16 - len(bitList)
+    #print 'zPad', zeroPad, 'bList', len(bitList), 'list', bitList
+    #if len(bitList) is 0:
+    #    return [False] * 16
+    #else:
+    return (([False] * zeroPad) + bitList)
+    
 
 #Require: Requires an exisitng pyAudio object which has set
 #       up the port audio system
@@ -115,10 +140,10 @@ def main():
     #    audio = record(p)
     #    show_wave(audio)
     stream = p.open(format=p.get_format_from_width(transmitChirp.getsampwidth()),
-                    channels=Channels,
-                    rate=Rate,
+                    channels=transmitChirp.getnchannels(),
+                    rate=transmitChirp.getframerate(),
                     input=True,
-                    output=False,
+                    output=True,
                     stream_callback=callback)
 
     stream.start_stream()
@@ -128,9 +153,7 @@ def main():
     #show_wave(recordData)
     recordData = []
 
-    chirp(p)
-    
-    
+    #chirp(p)        
     while True:
         #Keep just playing the chirp and showing the data
         #chirp(p)
