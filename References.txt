@@ -5,3 +5,6 @@ http://www.eddiem.com/projects/chirp/chirp.htm
 
 3.
 http://www.slideshare.net/dabeaz/an-introduction-to-python-concurrency
+
+4.
+http://people.csail.mit.edu/hubert/pyaudio/docs/#example-callback-mode-audio-i-o
