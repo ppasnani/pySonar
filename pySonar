@@ -12,8 +12,9 @@ transmitChirp = wave.open(ChirpFile, 'rb')
 
 Chunk = 1024
 Format = pyaudio.paInt16
-#Channels = 2
-#Rate = 44100#384000
+SampWidth = transmitChirp.getsampwidth()
+Channels = transmitChirp.getnchannels()
+Rate = transmitChirp.getframerate()
 #Record_Seconds = 1
 
 
@@ -22,29 +23,33 @@ Format = pyaudio.paInt16
 #Create a synchronized queue that can only hold one list
 recordQueue = Queue.Queue(Chunk)
 
-def callback(in_data, frame_count, time_info, status):
+def playcallback(in_data, frame_count, time_info, status):
     #print in_data[0:5]
     out_data = transmitChirp.readframes(frame_count)
     #int_out_data = fromstring(out_data, '
     #recordData.extend(fromstring(in_data, 'Int16'))
     #out_data = transmitChirp.readframes(Chunk)    
     #print out_data
-    transmitChirp.setpos(0)
+    #transmitChirp.setpos(0)
     
-    chirp_data = []
-    int_out_data = fromstring(out_data, 'Int16')
-    for b in int_out_data:
+    #chirp_data = []
+    #int_out_data = fromstring(out_data, 'Int16')
+    #for b in int_out_data:
         #print getBitArray(b)
-        chirp_data.extend(getBitArray(b))        
+    #    chirp_data.extend(getBitArray(b))        
     
-    recordQueue.put(fromstring(in_data, 'Int16'))
-    print 'frame', frame_count, 'data', len(chirp_data), 'indata', len(in_data)   
+    #recordQueue.put(fromstring(in_data, 'Int16'))
+    #print 'frame', frame_count, 'data', len(out_data), 'indata', len(in_data)   
     #recordQueue.task_done()
     #print 'stuck here'
-    if len(chirp_data) is 0:
-        return (in_data, pyaudio.paContinue)
-    else:
-        return(chirp_data , pyaudio.paContinue)
+    #if len(chirp_data) is 0:
+    #    return (in_data, pyaudio.paContinue)
+    #else:
+    return (out_data , pyaudio.paContinue)
+
+def recordcallback(in_data, frame_count, time_info, status):
+    recordQueue.put(fromstring(in_data, 'Int16'))
+    return (in_data, pyaudio.paContinue)
 
 #Require: An integer intNum
 #Ensures: Returns a list of numbers [0, 1] of length 16
@@ -118,17 +123,17 @@ def record(p):
 
 #Using [1] as reference
 def show_wave(audio):
-    #subplot(211)
-    #plot(audio)
-    #title('Wave form and spectrogram of recorded audio')
+    subplot(211)
+    plot(audio)
+    title('Wave form and spectrogram of recorded audio')
 
-    #subplot(212)    
+    subplot(212)    
     audioTime = float(len(audio)) / Rate
     #print (len(audio)), 'time', audioTime
         
     spectrogram = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
-    xlim([0, audioTime])
-    pause(0.01)
+    #xlim([0, audioTime])
+    pause(0.1)
     #show()
 
 def main():
@@ -139,23 +144,33 @@ def main():
     #    chirp(p)
     #    audio = record(p)
     #    show_wave(audio)
-    stream = p.open(format=p.get_format_from_width(transmitChirp.getsampwidth()),
-                    channels=transmitChirp.getnchannels(),
-                    rate=transmitChirp.getframerate(),
-                    input=True,
-                    output=True,
-                    stream_callback=callback)
-
-    stream.start_stream()
+    recordstream = p.open(format=p.get_format_from_width(SampWidth),
+                          channels=Channels,
+                          rate=Rate,
+                          input=True,
+                          output=False,
+                          stream_callback=recordcallback)
+    
     #time.sleep(1)
-    #stream.stop_stream()
+    recordstream.start_stream()
     #print len(recordData), "my length", recordDataLength
     #show_wave(recordData)
     recordData = []
-
+    
     #chirp(p)        
-    while True:
+    while recordstream.is_active():
+        playstream = p.open(format=p.get_format_from_width(transmitChirp.getsampwidth()),
+                    channels=transmitChirp.getnchannels(),
+                    rate=transmitChirp.getframerate(),
+                    input=False,
+                    output=True,
+                    stream_callback=playcallback)
         #Keep just playing the chirp and showing the data
+        playstream.start_stream()
+        time.sleep(0.5)
+        playstream.stop_stream()
+        playstream.close()
+        transmitChirp.setpos(0)
         #chirp(p)
         #time.sleep(0.5)
         #Stuck here trying to find a way to get new data from the callback
@@ -164,7 +179,7 @@ def main():
         recordData = []
         for i in range(recordQueue.qsize()):
             #print 'record extend'
-            recordData.extend(recordQueue.get(block=False))
+            recordData.extend(recordQueue.get())
             recordQueue.task_done()
             #print 'i', i
         #for l in recordFrameData:
@@ -173,10 +188,13 @@ def main():
         
         #print "recorded data", recordData[0:100]
         show_wave(recordData)
+        
+        #time.sleep(0.5)
 
     recordQueue.join()
-    stream.stop_stream()
-    stream.close()
+    recordstream.stop_stream()
+    recordstream.close()
+    playstream.close()
     
     p.terminate()
 

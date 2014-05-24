@@ -7,4 +7,4 @@ http://www.eddiem.com/projects/chirp/chirp.htm
 http://www.slideshare.net/dabeaz/an-introduction-to-python-concurrency
 
 4.
-http://www.slideshare.net/dabeaz/an-introduction-to-python-concurrency
+http://people.csail.mit.edu/hubert/pyaudio/docs/#example-callback-mode-audio-i-o
