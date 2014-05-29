@@ -10,6 +10,7 @@ import threading
 
 ChirpFile = "Sound Files/plain_chirp.wav"
 transmitChirp = wave.open(ChirpFile, 'rb')
+ChirpPeriod = 1
 
 Chunk = 1024
 Format = pyaudio.paInt16
@@ -53,7 +54,7 @@ def chirp(p):
         playstream.start_stream()
         #Temporary delay. Use some function of chirp length or
         #travel time for audio to determine this after threading function
-        time.sleep(1)
+        time.sleep(ChirpPeriod)
         playstream.stop_stream()
         playstream.close()
         transmitChirp.setpos(0)
@@ -70,7 +71,7 @@ def show_wave(audio):
         
     spectrogram = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
     #xlim([0, audioTime])
-    pause(1)
+    pause(1.5)
     #show()
 
 def main():
