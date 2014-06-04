@@ -88,9 +88,9 @@ def updatespectrum(i, sfig, rStream):
         sfig = specgram(recordData, Fs = Rate, scale_by_freq=True, sides='default')
     return sfig
 
-def plotspectrum(line, rStream):
+def plotspectrum(i, line, ax, rStream):
     print 'Bro A'
-    while rStream.is_active():
+    if rStream.is_active():
         print 'Bro B'
         recordData = []
         for x in range(recordQueue.qsize()):
@@ -108,22 +108,22 @@ def plotspectrum(line, rStream):
         #line.set_ydata(abs(Y))
         #line.set_data(abs(Y))
         old_len = len(line.get_xdata())
-        #line.set_xdata(np.append(line.get_xdata(), range(old_len, old_len + len(recordData))))
-        line.set_ydata(recordData[:199])
-        print 'Bro C:', len(recordData[:199]), 'x:', old_len
-        plt.draw()
-        
+        xmin, xmax = ax.get_xlim()
+        ax.set_xlim(xmin, old_len + len(recordData))
+        line.set_xdata(append(line.get_xdata(), range(old_len, old_len + len(recordData))))
+        line.set_ydata(append(line.get_ydata(), recordData))
+        print 'Bro C', recordData[1:10]        
+    return line, 
     
 
 def showspectrum(rStream):    
     #Pxx, freqs, t, fig = specgram([])
     #fig, ax = plt.specgram([1])
-    #fig, ax = plt.subplots()
-    #line, = ax.plot
-    hl, = plt.plot([], [])
-    
+    fig, ax = plt.subplots()
+    line, = ax.plot([], [])    
+    ax.set_ylim(-1.1, 1.1)
     print "Brah"
-    ani = animation.FuncAnimation(hl, plotspectrum, frames=20, interval=25, blit=True, fargs=(hl, rStream))
+    ani = animation.FuncAnimation(fig, plotspectrum, frames=200, interval=25, blit=True, fargs=(line, ax, rStream))
     plt.show()
 
 
