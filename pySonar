@@ -7,6 +7,10 @@ import time
 import Queue
 import winsound
 import threading
+import numpy as np
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+
 
 ChirpFile = "Sound Files/plain_chirp.wav"
 transmitChirp = wave.open(ChirpFile, 'rb')
@@ -74,6 +78,55 @@ def show_wave(audio):
     pause(1.5)
     #show()
 
+def updatespectrum(i, sfig, rStream):
+    if rStream.is_active():
+        recordData = []        
+        for x in range(recordQueue.qsize()):
+            recordData.extend(recordQueue.get())
+            recordQueue.task_done()
+            
+        sfig = specgram(recordData, Fs = Rate, scale_by_freq=True, sides='default')
+    return sfig
+
+def plotspectrum(line, rStream):
+    print 'Bro A'
+    while rStream.is_active():
+        print 'Bro B'
+        recordData = []
+        for x in range(recordQueue.qsize()):
+            recordData.extend(recordQueue.get())
+            recordQueue.task_done()
+        #n = len(recordData)
+        
+        #k = arange(n)
+        #T = n/float(Rate)
+        #frq = k/T #Two sided frequency range
+        #frq = frq[range(n/2)] #one sided frequency range
+        #print 'Bro C', n, 'freq', frq
+        #Y = fft(recordData) / n #fft computing and normalization
+        #Y = Y[range(n/2)]
+        #line.set_ydata(abs(Y))
+        #line.set_data(abs(Y))
+        old_len = len(line.get_xdata())
+        #line.set_xdata(np.append(line.get_xdata(), range(old_len, old_len + len(recordData))))
+        line.set_ydata(recordData[:199])
+        print 'Bro C:', len(recordData[:199]), 'x:', old_len
+        plt.draw()
+        
+    
+
+def showspectrum(rStream):    
+    #Pxx, freqs, t, fig = specgram([])
+    #fig, ax = plt.specgram([1])
+    #fig, ax = plt.subplots()
+    #line, = ax.plot
+    hl, = plt.plot([], [])
+    
+    print "Brah"
+    ani = animation.FuncAnimation(hl, plotspectrum, frames=20, interval=25, blit=True, fargs=(hl, rStream))
+    plt.show()
+
+
 def main():
     #Instantiate pyAudio
     p = pyaudio.PyAudio()
@@ -85,28 +138,29 @@ def main():
                           output=False,
                           stream_callback=recordcallback)
     #Create a thread to chirp continuously
-    t1 = threading.Thread(target=chirp, args=(p,))
-    t1.setDaemon(True)
-    t1.start()
+    #t1 = threading.Thread(target=chirp, args=(p,))
+    #t1.setDaemon(True)
+    #t1.start()
     #Create a "thread" to record continuousl
     recordstream.start_stream()    
-    recordData = []
-      
-    while recordstream.is_active():        
+    #recordData = []
+    showspectrum(recordstream)
+
+    #while recordstream.is_active():        
         #Transmit "chirp" to listen for in echoes
         #chirp(p)
 
         #Get the recorded data from the synchronized priority queue
-        recordData = []
-        for i in range(recordQueue.qsize()):            
-            recordData.extend(recordQueue.get())
-            recordQueue.task_done()
+        #recordData = []
+        #for i in range(recordQueue.qsize()):            
+            #recordData.extend(recordQueue.get())
+            #recordQueue.task_done()
             
         #Display it
-        show_wave(recordData)
+        #show_wave(recordData)
         
     #Wait for the threads to end and cleanup
-    t1.join()
+    #t1.join()
         
     recordQueue.join()
     recordstream.stop_stream()
