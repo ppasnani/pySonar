@@ -89,9 +89,9 @@ def updatespectrum(i, sfig, rStream):
     return sfig
 
 def plotspectrum(i, line, ax, rStream):
-    print 'Bro A'
+    #print 'Bro A'
     if rStream.is_active():
-        print 'Bro B'
+        #print 'Bro B'
         recordData = []
         for x in range(recordQueue.qsize()):
             recordData.extend(recordQueue.get())
@@ -109,10 +109,11 @@ def plotspectrum(i, line, ax, rStream):
         #line.set_data(abs(Y))
         old_len = len(line.get_xdata())
         xmin, xmax = ax.get_xlim()
-        ax.set_xlim(xmin, old_len + len(recordData))
+        ax.set_xlim(old_len, old_len + len(recordData))
         line.set_xdata(append(line.get_xdata(), range(old_len, old_len + len(recordData))))
         line.set_ydata(append(line.get_ydata(), recordData))
-        print 'Bro C', recordData[1:10]        
+        
+        #print 'Bro C', recordData[0:10]
     return line, 
     
 
@@ -120,10 +121,12 @@ def showspectrum(rStream):
     #Pxx, freqs, t, fig = specgram([])
     #fig, ax = plt.specgram([1])
     fig, ax = plt.subplots()
-    line, = ax.plot([], [])    
-    ax.set_ylim(-1.1, 1.1)
+    line, = ax.plot([], [])
+    #Y Limit based on audio bit depth of 16 for now
+    #
+    ax.set_ylim(-1000, 1000)
     print "Brah"
-    ani = animation.FuncAnimation(fig, plotspectrum, frames=200, interval=25, blit=True, fargs=(line, ax, rStream))
+    ani = animation.FuncAnimation(fig, plotspectrum, interval=20, blit=True, fargs=(line, ax, rStream))
     plt.show()
 
 
