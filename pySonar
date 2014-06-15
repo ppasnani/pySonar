@@ -10,6 +10,8 @@ import threading
 import numpy as np
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
+import scipy
+import scipy.fftpack
 
 
 ChirpFile = "Sound Files/plain_chirp.wav"
@@ -78,20 +80,39 @@ def show_wave(audio):
     pause(1.5)
     #show()
 
-def updatespectrum(i, sfig, rStream):
+def plotspectrum(i, line, ax, rStream):
     if rStream.is_active():
         recordData = []        
         for x in range(recordQueue.qsize()):
             recordData.extend(recordQueue.get())
             recordQueue.task_done()
             
-        sfig = specgram(recordData, Fs = Rate, scale_by_freq=True, sides='default')
-    return sfig
+        #newim = specgram(recordData, Fs = Rate, scale_by_freq=True, sides='default')
+        #im.set_data(newim)
+        #if len(recordData) > 0:            
+            FFT = abs(scipy.fft(recordData))
+            timestep = 1 / float(Rate)
+            freqs = scipy.fftpack.fftfreq(len(recordData), timestep)
+            line.set_xdata(freqs)
+            line.set_ydata(20*scipy.log10(FFT))
+            #ax.autoscale_view()
+            ax.set_ylim(0, 200)
+            ax.set_xlim(-Rate/2, Rate/2)
+            #print 'DUUUDE. I am FFTING', freqs
+    return line,
 
-def plotspectrum(i, line, ax, rStream):
-    #print 'Bro A'
+def showspectrum(rStream):
+    #Pxx, freqs, bins, im = specgram([], Fs = Rate, scale_by_freq = True, sides = 'default')
+    fig, ax = plt.subplots()
+    line, = ax.plot([],[])
+    aniF = animation.FuncAnimation(fig, plotspectrum, interval = 25, blit = True,
+                                   fargs = (line, ax, rStream))
+    ax.clear()
+    show()
+
+def plotwave(i, line, ax, rStream):
+
     if rStream.is_active():
-        #print 'Bro B'
         recordData = []
         for x in range(recordQueue.qsize()):
             recordData.extend(recordQueue.get())
@@ -113,11 +134,10 @@ def plotspectrum(i, line, ax, rStream):
         line.set_xdata(append(line.get_xdata(), range(old_len, old_len + len(recordData))))
         line.set_ydata(append(line.get_ydata(), recordData))
         
-        #print 'Bro C', recordData[0:10]
     return line, 
     
 
-def showspectrum(rStream):    
+def showwave(rStream):    
     #Pxx, freqs, t, fig = specgram([])
     #fig, ax = plt.specgram([1])
     fig, ax = plt.subplots()
@@ -126,7 +146,8 @@ def showspectrum(rStream):
     #
     ax.set_ylim(-1000, 1000)
     print "Brah"
-    ani = animation.FuncAnimation(fig, plotspectrum, interval=20, blit=True, fargs=(line, ax, rStream))
+    ani = animation.FuncAnimation(fig, plotwave, interval = 20, blit = True,
+                                  fargs=(line, ax, rStream))
     plt.show()
 
 
