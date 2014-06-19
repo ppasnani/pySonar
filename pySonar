@@ -23,8 +23,8 @@ Format = pyaudio.paInt16
 SampWidth = transmitChirp.getsampwidth()
 Channels = transmitChirp.getnchannels()
 Rate = transmitChirp.getframerate()
-#Time in seconds to display at one time on the waterfall display
-WaterfallTime = 1; 
+#Time in seconds to display at one time on the waveform display
+WindowTime = 1 
 
 #Create a synchronized queue that can only hold one list
 recordQueue = Queue.Queue(Chunk)
@@ -67,54 +67,31 @@ def chirp(p):
         playstream.close()
         transmitChirp.setpos(0)
 
+#Requires: A start and stop number and the number of points n
+#Ensures: Returns a list of floats of size n such that the first
+#       item is the start number, the last item is the stop number
+#Code from [5]
+def myfrange(start, stop, n):
+    L = [0.0] * n
+    nm1 = n - 1
+    nm1inv = 1.0 / nm1
+    for i in range(n):
+        L[i] = nm1inv * (start*(nm1 - i) + stop*i)
+    return L
+
 #Using [1] as reference
-def show_wave(audio):
-    subplot(211)
-    plot(audio)
-    title('Wave form and spectrogram of recorded audio')
-
-    subplot(212)    
+def showtimespectrum(audio):
+    #subplot(211)
+    #plot(audio)
+    title('Spectrogram of recorded audio')
+    #subplot(212)    
     audioTime = float(len(audio)) / Rate
-    #print (len(audio)), 'time', audioTime
         
-    spectrogram = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
-    #xlim([0, audioTime])
-    pause(1.5)
-    #show()
-
-def plotwaterfall(i, rStream):
-    if rStream.is_active():
-        recordData = []
-        for x in range(recordQueue.qsize()):
-            recordData.extend(recordQueue.get())
-            recordQueue.task_done()
-
-        FFT = abs(scipy.fft(recordData))
-        timestep = 1 / float(Rate)
-        freqs = scipy.fftpack.fftfreq(len(recordData), timestep)
-        #print 'Freaks', freqs.tolist()
-        #timeAxis = 0:WaterfallTime*Rate
-        print 'Freqlen', len(freqs), 'wfallTime', WaterfallTime*Rate
-        timeY, freqX = np.mgrid[0:WaterfallTime*Rate, 0:len(freqs)]
-        plt.pcolormesh(freqX, timeY, FFT)
-        #plt.show()
-        
-
-def showwaterfall(rStream):
-    fig = plt.figure()
-    #line, = ax.plot([],[])
-    plt.hold(True)
+    Pxx, freqs, bins, im = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
     
-    emptyY, emptyX = np.mgrid[0:2, 0:2]
-    emptyZ = 0*emptyX*emptyY;
-    cmap = plt.get_cmap('RdYlGn')
-
-    plt.pcolormesh(emptyX, emptyY, emptyZ, cmap=cmap)
-    aniFunc = animation.FuncAnimation(fig, plotwaterfall, frames=range(2, 155), blit=True,
-                                      fargs = (rStream,))
-    #ax.clear()
-    plt.show()
-    plt.hold(False)
+    xlim([0, audioTime])
+    pause(0.5)
+    #show()
 
 def plotspectrum(i, line, ax, rStream):
     if rStream.is_active():
@@ -123,9 +100,6 @@ def plotspectrum(i, line, ax, rStream):
             recordData.extend(recordQueue.get())
             recordQueue.task_done()
             
-        #newim = specgram(recordData, Fs = Rate, scale_by_freq=True, sides='default')
-        #im.set_data(newim)
-        #if len(recordData) > 0:            
             FFT = abs(scipy.fft(recordData))
             timestep = 1 / float(Rate)
             freqs = scipy.fftpack.fftfreq(len(recordData), timestep)
@@ -153,23 +127,31 @@ def plotwave(i, line, ax, rStream):
         for x in range(recordQueue.qsize()):
             recordData.extend(recordQueue.get())
             recordQueue.task_done()
-        #n = len(recordData)
+
+        old_x_data = line.get_xdata()
+        old_y_data = line.get_ydata()
+        old_sample_len = len(old_x_data)
+        new_sample_len = len(recordData)
+        #Length in seconds of old and new data                        
+        old_len = old_sample_len / float(Rate)
+        new_len = new_sample_len / float(Rate)
         
-        #k = arange(n)
-        #T = n/float(Rate)
-        #frq = k/T #Two sided frequency range
-        #frq = frq[range(n/2)] #one sided frequency range
-        #print 'Bro C', n, 'freq', frq
-        #Y = fft(recordData) / n #fft computing and normalization
-        #Y = Y[range(n/2)]
-        #line.set_ydata(abs(Y))
-        #line.set_data(abs(Y))
-        old_len = len(line.get_xdata())
+        #x-axis in seconds
         xmin, xmax = ax.get_xlim()
-        ax.set_xlim(old_len, old_len + len(recordData))
-        line.set_xdata(append(line.get_xdata(), range(old_len, old_len + len(recordData))))
-        line.set_ydata(append(line.get_ydata(), recordData))
         
+        #If old data is atleast the length of waterfall time then just
+        #move the window forward. Otherwise keep adding data until atleast
+        #window time
+        if old_len >= WindowTime:
+            ax.set_xlim(xmin+new_len, xmax+new_len)
+            line.set_xdata(myfrange(xmin+new_len, xmax+new_len, old_sample_len))            
+            line.set_ydata(append(old_y_data[new_sample_len:], recordData))
+        else:
+            ax.set_xlim(xmin, xmax+new_len)
+            #print 'Build window'
+            line.set_xdata(myfrange(xmin, xmax+new_len, old_sample_len + new_sample_len))
+            line.set_ydata(append(old_y_data, recordData))
+                  
     return line, 
     
 
@@ -182,8 +164,9 @@ def showwave(rStream):
     #
     ax.set_ylim(-1000, 1000)
     print "Brah"
-    ani = animation.FuncAnimation(fig, plotwave, interval = 20, blit = True,
+    ani = animation.FuncAnimation(fig, plotwave, interval = 5, blit = True,
                                   fargs=(line, ax, rStream))
+    ax.clear()
     plt.show()
 
 
@@ -198,29 +181,32 @@ def main():
                           output=False,
                           stream_callback=recordcallback)
     #Create a thread to chirp continuously
-    #t1 = threading.Thread(target=chirp, args=(p,))
-    #t1.setDaemon(True)
-    #t1.start()
-    #Create a "thread" to record continuousl
+    t1 = threading.Thread(target=chirp, args=(p,))
+    t1.setDaemon(True)
+    t1.start()
+    #Create a "thread" to record continuosly
     recordstream.start_stream()    
-    #recordData = []
-    showwaterfall(recordstream)
+    
+    #Comment out one of the below two lines to show either the audio
+    #waveform or the FFT spectrum
+    #Keep both commented out if using the following for loop to show
+    #timespectrum
+    #showwave(recordstream)
+    #showspectrum(recordstream)
 
-    #while recordstream.is_active():        
-        #Transmit "chirp" to listen for in echoes
-        #chirp(p)
-
+    #Old code to display fft spectrum versus time
+    #Buggy and slow as hell but worth keeping
+    while recordstream.is_active():                
         #Get the recorded data from the synchronized priority queue
-        #recordData = []
-        #for i in range(recordQueue.qsize()):            
-            #recordData.extend(recordQueue.get())
-            #recordQueue.task_done()
-            
+        recordData = []
+        for i in range(recordQueue.qsize()):            
+            recordData.extend(recordQueue.get())
+            recordQueue.task_done()            
         #Display it
-        #show_wave(recordData)
+        showtimespectrum(recordData)
         
     #Wait for the threads to end and cleanup
-    #t1.join()
+    t1.join()
         
     recordQueue.join()
     recordstream.stop_stream()
