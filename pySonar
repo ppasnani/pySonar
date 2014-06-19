@@ -23,6 +23,8 @@ Format = pyaudio.paInt16
 SampWidth = transmitChirp.getsampwidth()
 Channels = transmitChirp.getnchannels()
 Rate = transmitChirp.getframerate()
+#Time in seconds to display at one time on the waterfall display
+WaterfallTime = 1; 
 
 #Create a synchronized queue that can only hold one list
 recordQueue = Queue.Queue(Chunk)
@@ -79,6 +81,40 @@ def show_wave(audio):
     #xlim([0, audioTime])
     pause(1.5)
     #show()
+
+def plotwaterfall(i, rStream):
+    if rStream.is_active():
+        recordData = []
+        for x in range(recordQueue.qsize()):
+            recordData.extend(recordQueue.get())
+            recordQueue.task_done()
+
+        FFT = abs(scipy.fft(recordData))
+        timestep = 1 / float(Rate)
+        freqs = scipy.fftpack.fftfreq(len(recordData), timestep)
+        #print 'Freaks', freqs.tolist()
+        #timeAxis = 0:WaterfallTime*Rate
+        print 'Freqlen', len(freqs), 'wfallTime', WaterfallTime*Rate
+        timeY, freqX = np.mgrid[0:WaterfallTime*Rate, 0:len(freqs)]
+        plt.pcolormesh(freqX, timeY, FFT)
+        #plt.show()
+        
+
+def showwaterfall(rStream):
+    fig = plt.figure()
+    #line, = ax.plot([],[])
+    plt.hold(True)
+    
+    emptyY, emptyX = np.mgrid[0:2, 0:2]
+    emptyZ = 0*emptyX*emptyY;
+    cmap = plt.get_cmap('RdYlGn')
+
+    plt.pcolormesh(emptyX, emptyY, emptyZ, cmap=cmap)
+    aniFunc = animation.FuncAnimation(fig, plotwaterfall, frames=range(2, 155), blit=True,
+                                      fargs = (rStream,))
+    #ax.clear()
+    plt.show()
+    plt.hold(False)
 
 def plotspectrum(i, line, ax, rStream):
     if rStream.is_active():
@@ -168,7 +204,7 @@ def main():
     #Create a "thread" to record continuousl
     recordstream.start_stream()    
     #recordData = []
-    showspectrum(recordstream)
+    showwaterfall(recordstream)
 
     #while recordstream.is_active():        
         #Transmit "chirp" to listen for in echoes
