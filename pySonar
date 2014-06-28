@@ -5,18 +5,17 @@ import wave
 from pylab import *
 import time
 import Queue
-import winsound
 import threading
 import numpy as np
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-import scipy
+import scipy.io.wavfile
 import scipy.fftpack
 
 
-ChirpFile = "Sound Files/plain_chirp.wav"
+ChirpFile = "sound files/plain_chirp.wav"
 transmitChirp = wave.open(ChirpFile, 'rb')
-ChirpPeriod = 1
+ChirpPeriod = 2
 
 Chunk = 1024
 Format = pyaudio.paInt16
@@ -24,7 +23,7 @@ SampWidth = transmitChirp.getsampwidth()
 Channels = transmitChirp.getnchannels()
 Rate = transmitChirp.getframerate()
 #Time in seconds to display at one time on the waveform display
-WindowTime = 1 
+WindowTime = 1
 
 #Create a synchronized queue that can only hold one list
 recordQueue = Queue.Queue(Chunk)
@@ -63,9 +62,11 @@ def chirp(p):
         #Temporary delay. Use some function of chirp length or
         #travel time for audio to determine this after threading function
         time.sleep(ChirpPeriod)
+        #pause(ChirpPeriod)
         playstream.stop_stream()
         playstream.close()
-        transmitChirp.setpos(0)
+        #transmitChirp.setpos(0)
+        transmitChirp.rewind()
 
 #Requires: A start and stop number and the number of points n
 #Ensures: Returns a list of floats of size n such that the first
@@ -79,18 +80,41 @@ def myfrange(start, stop, n):
         L[i] = nm1inv * (start*(nm1 - i) + stop*i)
     return L
 
+#Requires: A numpy array of non-zero length of audio data that has been recorded
+#Ensures: Returns a numpy array result of the correlation with the ChirpFile
+
+def findechoes(receivedAudio):
+    #transmittedWave = wave.open(ChirpFile, 'rb')
+    (sampRate, dataArray) = scipy.io.wavfile.read(ChirpFile)
+    #print 'opened file at', sampRate
+    numChunks = np.ceil(len(receivedAudio) / float(len(dataArray)))
+    corrData = []
+    for i in range(int(numChunks)):
+        startIndex = len(dataArray) * i
+        endIndex = startIndex + len(dataArray)
+        corrData.extend(np.correlate(dataArray, 
+                                     receivedAudio[startIndex:endIndex]))
+    #print np.correlate(dataArray, receivedAudio[0:len(dataArray)+1], 'same')
+    #print 'Corrdata', corrData
+    return corrData
+
 #Using [1] as reference
 def showtimespectrum(audio):
-    #subplot(211)
+    subplot(211)
     #plot(audio)
     title('Spectrogram of recorded audio')
     #subplot(212)    
     audioTime = float(len(audio)) / Rate
         
-    Pxx, freqs, bins, im = specgram(audio, Fs = Rate, scale_by_freq=True, sides='default')
+    Pxx, freqs, bins, im = specgram(audio, Fs = Rate, 
+                                    scale_by_freq=True, sides='default')
     
     xlim([0, audioTime])
+    corrResult = findechoes(audio)
+    subplot(212)
+    plt.plot(corrResult)
     pause(0.5)
+    plt.clf()
     #show()
 
 def plotspectrum(i, line, ax, rStream):
@@ -115,8 +139,8 @@ def showspectrum(rStream):
     #Pxx, freqs, bins, im = specgram([], Fs = Rate, scale_by_freq = True, sides = 'default')
     fig, ax = plt.subplots()
     line, = ax.plot([],[])
-    aniF = animation.FuncAnimation(fig, plotspectrum, interval = 25, blit = True,
-                                   fargs = (line, ax, rStream))
+    aniF = animation.FuncAnimation(fig, plotspectrum, interval = 25, 
+                                   blit = True, fargs = (line, ax, rStream))
     ax.clear()
     show()
 
@@ -144,16 +168,16 @@ def plotwave(i, line, ax, rStream):
         #window time
         if old_len >= WindowTime:
             ax.set_xlim(xmin+new_len, xmax+new_len)
-            line.set_xdata(myfrange(xmin+new_len, xmax+new_len, old_sample_len))            
+            line.set_xdata(myfrange(xmin+new_len,xmax+new_len,old_sample_len))
             line.set_ydata(append(old_y_data[new_sample_len:], recordData))
         else:
             ax.set_xlim(xmin, xmax+new_len)
             #print 'Build window'
-            line.set_xdata(myfrange(xmin, xmax+new_len, old_sample_len + new_sample_len))
+            line.set_xdata(myfrange(xmin, xmax+new_len, 
+                                    old_sample_len + new_sample_len))
             line.set_ydata(append(old_y_data, recordData))
                   
     return line, 
-    
 
 def showwave(rStream):    
     #Pxx, freqs, t, fig = specgram([])
@@ -164,11 +188,10 @@ def showwave(rStream):
     #
     ax.set_ylim(-1000, 1000)
     print "Brah"
-    ani = animation.FuncAnimation(fig, plotwave, interval = 5, blit = True,
+    ani = animation.FuncAnimation(fig, plotwave, interval = 15, blit = True,
                                   fargs=(line, ax, rStream))
     ax.clear()
     plt.show()
-
 
 def main():
     #Instantiate pyAudio
@@ -193,7 +216,7 @@ def main():
     #timespectrum
     #showwave(recordstream)
     #showspectrum(recordstream)
-
+    
     #Old code to display fft spectrum versus time
     #Buggy and slow as hell but worth keeping
     while recordstream.is_active():                
@@ -204,6 +227,7 @@ def main():
             recordQueue.task_done()            
         #Display it
         showtimespectrum(recordData)
+        #showtimewave(recordData)
         
     #Wait for the threads to end and cleanup
     t1.join()
